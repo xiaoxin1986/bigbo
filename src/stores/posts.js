@@ -146,6 +146,62 @@ export const usePostsStore = defineStore('posts', () => {
   }
 
   /**
+   * 切换点赞状态：服务端成功后才更新本地，保持单一数据源不变式。
+   * @param {string} id
+   * @returns {Promise<{ ok: true, post: object } | { ok: false, code: string, message: string }>}
+   */
+  async function toggleLike(id) {
+    const target = posts.value.find((post) => post.id === id)
+    if (!target) return { ok: false, code: 'NOT_FOUND', message: '动态不存在' }
+
+    let result
+    try {
+      result = await client.setLike(id, !target.liked)
+    } catch {
+      result = { ok: false, code: 'NETWORK' }
+    }
+
+    if (!result || !result.ok) {
+      return {
+        ok: false,
+        code: (result && result.code) || 'NETWORK',
+        message: (result && result.message) || '点赞失败，请稍后重试',
+      }
+    }
+
+    posts.value = posts.value.map((post) => (post.id === id ? result.post : post))
+    return { ok: true, post: result.post }
+  }
+
+  /**
+   * 切换收藏状态：服务端成功后才更新本地。
+   * @param {string} id
+   * @returns {Promise<{ ok: true, post: object } | { ok: false, code: string, message: string }>}
+   */
+  async function toggleFavorite(id) {
+    const target = posts.value.find((post) => post.id === id)
+    if (!target) return { ok: false, code: 'NOT_FOUND', message: '动态不存在' }
+
+    let result
+    try {
+      result = await client.setFavorite(id, !target.favorited)
+    } catch {
+      result = { ok: false, code: 'NETWORK' }
+    }
+
+    if (!result || !result.ok) {
+      return {
+        ok: false,
+        code: (result && result.code) || 'NETWORK',
+        message: (result && result.message) || '收藏失败，请稍后重试',
+      }
+    }
+
+    posts.value = posts.value.map((post) => (post.id === id ? result.post : post))
+    return { ok: true, post: result.post }
+  }
+
+  /**
    * 推进相对时间基准，让"几分钟前"随真实时间刷新。
    * @param {number} [timestamp]
    */
@@ -165,6 +221,8 @@ export const usePostsStore = defineStore('posts', () => {
     hydrate,
     publish,
     remove,
+    toggleLike,
+    toggleFavorite,
     tick,
   }
 })

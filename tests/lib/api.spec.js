@@ -2,6 +2,8 @@ import { describe, it, expect, vi } from 'vitest'
 import {
   API_BASE,
   DELETE_NETWORK_MESSAGE,
+  FAVORITE_NETWORK_MESSAGE,
+  LIKE_NETWORK_MESSAGE,
   NETWORK_MESSAGE,
   createApiClient,
   normalizePost,
@@ -30,7 +32,15 @@ const makeClient = (impl) => {
   return { fetchImpl, client: createApiClient({ fetchImpl }) }
 }
 
-const validPost = { id: 'p-1', content: '第一条动态', createdAt: 1700000000000 }
+const validPost = {
+  id: 'p-1',
+  content: '第一条动态',
+  createdAt: 1700000000000,
+  liked: false,
+  favorited: false,
+  likeCount: 0,
+  favoriteCount: 0,
+}
 
 describe('createApiClient', () => {
   it('默认基地址为 /api', () => {
@@ -83,7 +93,15 @@ describe('listPosts', () => {
 
     expect(result.ok).toBe(true)
     expect(result.posts.map((post) => post.id)).toEqual(['p-1'])
-    expect(result.posts[0]).toEqual({ id: 'p-1', content: '保留我', createdAt: 1700000000000 })
+    expect(result.posts[0]).toEqual({
+      id: 'p-1',
+      content: '保留我',
+      createdAt: 1700000000000,
+      liked: false,
+      favorited: false,
+      likeCount: 0,
+      favoriteCount: 0,
+    })
   })
 
   it('纯图片动态（正文为空）不会被误过滤', async () => {
@@ -276,5 +294,116 @@ describe('normalizePost', () => {
       ...validPost,
       image: { dataUrl: 'data:x', name: null },
     })
+  })
+
+  it('缺失点赞 / 收藏字段时补齐默认值（向后兼容）', () => {
+    expect(normalizePost({ id: 'p-1', content: '老数据', createdAt: 1700000000000 })).toEqual({
+      id: 'p-1',
+      content: '老数据',
+      createdAt: 1700000000000,
+      liked: false,
+      favorited: false,
+      likeCount: 0,
+      favoriteCount: 0,
+    })
+  })
+
+  it('非布尔的 liked / favorited 归一化为 false，非法计数归零', () => {
+    expect(
+      normalizePost({
+        id: 'p-1',
+        content: '脏数据',
+        createdAt: 1700000000000,
+        liked: 'yes',
+        favorited: 1,
+        likeCount: 'many',
+        favoriteCount: -3,
+      }),
+    ).toEqual({
+      id: 'p-1',
+      content: '脏数据',
+      createdAt: 1700000000000,
+      liked: false,
+      favorited: false,
+      likeCount: 0,
+      favoriteCount: 0,
+    })
+  })
+})
+
+describe('setLike / setFavorite', () => {
+  it('setLike 发送 PUT 并返回规范化后的动态', async () => {
+    const { fetchImpl, client } = makeClient(async () =>
+      jsonResponse({ post: { ...validPost, liked: true, likeCount: 1 } }),
+    )
+
+    const result = await client.setLike('p-1', true)
+
+    expect(result.ok).toBe(true)
+    expect(result.post.liked).toBe(true)
+    expect(result.post.likeCount).toBe(1)
+
+    const [url, options] = fetchImpl.mock.calls[0]
+    expect(url).toBe('/api/posts/p-1/like')
+    expect(options.method).toBe('PUT')
+    expect(options.headers['Content-Type']).toBe('application/json')
+    expect(JSON.parse(options.body)).toEqual({ liked: true })
+  })
+
+  it('setFavorite 发送 PUT 并返回规范化后的动态', async () => {
+    const { fetchImpl, client } = makeClient(async () =>
+      jsonResponse({ post: { ...validPost, favorited: true, favoriteCount: 1 } }),
+    )
+
+    const result = await client.setFavorite('p-1', true)
+
+    expect(result.ok).toBe(true)
+    expect(result.post.favorited).toBe(true)
+    expect(result.post.favoriteCount).toBe(1)
+
+    const [url, options] = fetchImpl.mock.calls[0]
+    expect(url).toBe('/api/posts/p-1/favorite')
+    expect(JSON.parse(options.body)).toEqual({ favorited: true })
+  })
+
+  it('setLike 网络异常返回 NETWORK 且文案固定', async () => {
+    const { client } = makeClient(async () => {
+      throw new Error('offline')
+    })
+
+    expect(await client.setLike('p-1', true)).toEqual({
+      ok: false,
+      code: 'NETWORK',
+      message: LIKE_NETWORK_MESSAGE,
+    })
+  })
+
+  it('setFavorite 网络异常返回 NETWORK 且文案固定', async () => {
+    const { client } = makeClient(async () => {
+      throw new Error('offline')
+    })
+
+    const result = await client.setFavorite('p-1', true)
+    expect(result.code).toBe('NETWORK')
+    expect(result.message).toBe(FAVORITE_NETWORK_MESSAGE)
+  })
+
+  it('404 返回 NOT_FOUND', async () => {
+    const { client } = makeClient(async () =>
+      jsonResponse({ error: { code: 'NOT_FOUND', message: '动态不存在' } }, 404),
+    )
+
+    expect(await client.setLike('p-x', true)).toEqual({
+      ok: false,
+      code: 'NOT_FOUND',
+      message: '动态不存在',
+    })
+  })
+
+  it('5xx 返回 SERVER', async () => {
+    const { client } = makeClient(async () =>
+      jsonResponse({ error: { code: 'INTERNAL_ERROR' } }, 500),
+    )
+    expect((await client.setFavorite('p-1', true)).code).toBe('SERVER')
   })
 })

@@ -14,6 +14,12 @@ export const NETWORK_MESSAGE = '服务端不可用，内容未能保存'
 /** 删除时服务端不可用的统一文案 */
 export const DELETE_NETWORK_MESSAGE = '服务端不可用，删除未能完成'
 
+/** 点赞时服务端不可用的统一文案 */
+export const LIKE_NETWORK_MESSAGE = '服务端不可用，点赞未能完成'
+
+/** 收藏时服务端不可用的统一文案 */
+export const FAVORITE_NETWORK_MESSAGE = '服务端不可用，收藏未能完成'
+
 /** 服务端返回未知错误时的兜底文案 */
 export const SERVER_MESSAGE = '服务端出错了，请稍后重试'
 
@@ -53,14 +59,26 @@ export function isValidImage(image) {
 export function normalizePost(value) {
   if (!value || typeof value !== 'object') return null
 
-  const { id, content, createdAt, image } = value
+  const { id, content, createdAt, image, liked, favorited, likeCount, favoriteCount } = value
   if (typeof id !== 'string' || id.length === 0) return null
   if (typeof content !== 'string') return null
   if (typeof createdAt !== 'number' || !Number.isFinite(createdAt)) return null
   if (!isValidImage(image)) return null
   if (content.length === 0 && image == null) return null
 
-  const post = { id, content, createdAt }
+  const post = {
+    id,
+    content,
+    createdAt,
+    liked: liked === true,
+    favorited: favorited === true,
+    likeCount:
+      typeof likeCount === 'number' && Number.isFinite(likeCount) && likeCount >= 0 ? likeCount : 0,
+    favoriteCount:
+      typeof favoriteCount === 'number' && Number.isFinite(favoriteCount) && favoriteCount >= 0
+        ? favoriteCount
+        : 0,
+  }
   if (image != null) {
     post.image = {
       dataUrl: image.dataUrl,
@@ -202,7 +220,63 @@ export function createApiClient({ baseUrl = API_BASE, fetchImpl } = {}) {
     return failure('SERVER', SERVER_MESSAGE)
   }
 
-  return { listPosts, createPost, deletePost }
+  /**
+   * 设置点赞 / 收藏状态（显式布尔值，幂等）。
+   * @param {string} id
+   * @param {'liked' | 'favorited'} field
+   * @param {boolean} value
+   * @param {string} networkMessage
+   * @returns {Promise<{ ok: true, post: object } | { ok: false, code: string, message: string }>}
+   */
+  async function setReaction(id, field, value, networkMessage) {
+    if (typeof id !== 'string' || id.length === 0) return failure('NOT_FOUND', '动态不存在')
+
+    const endpoint = field === 'liked' ? 'like' : 'favorite'
+    const sent = await send(`${baseUrl}/posts/${encodeURIComponent(id)}/${endpoint}`, {
+      method: 'PUT',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({ [field]: value === true }),
+    })
+    if (!sent.ok) return failure('NETWORK', networkMessage)
+
+    const { response } = sent
+    const data = await readJson(response)
+
+    if (response.ok) {
+      const post = normalizePost(data && data.post)
+      if (post) return { ok: true, post }
+      return data === null ? failure('NETWORK', networkMessage) : failure('SERVER', SERVER_MESSAGE)
+    }
+
+    const error = data && data.error ? data.error : null
+    if (error && error.code === 'NOT_FOUND') {
+      const message =
+        typeof error.message === 'string' && error.message.length > 0 ? error.message : '动态不存在'
+      return failure('NOT_FOUND', message)
+    }
+    return failure('SERVER', SERVER_MESSAGE)
+  }
+
+  /**
+   * 点赞 / 取消点赞。
+   * @param {string} id
+   * @param {boolean} liked
+   */
+  async function setLike(id, liked) {
+    return setReaction(id, 'liked', liked, LIKE_NETWORK_MESSAGE)
+  }
+
+  /**
+   * 收藏 / 取消收藏。
+   * @param {string} id
+   * @param {boolean} favorited
+   */
+  async function setFavorite(id, favorited) {
+    return setReaction(id, 'favorited', favorited, FAVORITE_NETWORK_MESSAGE)
+  }
+
+  return { listPosts, createPost, deletePost, setLike, setFavorite }
 }
 
 /** 应用默认使用的单例；测试可用 setApiClient 注入替身 */

@@ -50,6 +50,24 @@ function createServer(initial = []) {
       return noContentResponse()
     }
 
+    const reactionMatch = url.match(/^\/api\/posts\/([^/]+)\/(like|favorite)$/)
+    if (method === 'PUT' && reactionMatch) {
+      const id = decodeURIComponent(reactionMatch[1])
+      const kind = reactionMatch[2]
+      const post = state.find((item) => item.id === id)
+      if (!post) return jsonResponse({ error: { code: 'NOT_FOUND', message: '动态不存在' } }, 404)
+
+      const payload = JSON.parse(options.body || '{}')
+      if (kind === 'like') {
+        post.liked = payload.liked === true
+        post.likeCount = post.liked ? 1 : 0
+      } else {
+        post.favorited = payload.favorited === true
+        post.favoriteCount = post.favorited ? 1 : 0
+      }
+      return jsonResponse({ post: { ...post } })
+    }
+
     return jsonResponse({ error: { code: 'NOT_FOUND', message: '资源不存在' } }, 404)
   })
 
@@ -409,6 +427,106 @@ describe('usePostsStore', () => {
 
       expect((await store.remove('p-1')).code).toBe('NETWORK')
       expect(store.postCount).toBe(1)
+    })
+  })
+
+  describe('toggleLike / toggleFavorite', () => {
+    it('toggleLike 点赞成功后更新本地状态与计数', async () => {
+      useServer([{ id: 'p-1', content: '点赞对象', createdAt: 1700000000000 }])
+      const store = usePostsStore()
+      await store.hydrate()
+
+      expect(store.posts[0].liked).toBe(false)
+      expect(store.posts[0].likeCount).toBe(0)
+
+      const result = await store.toggleLike('p-1')
+
+      expect(result.ok).toBe(true)
+      expect(store.posts[0].liked).toBe(true)
+      expect(store.posts[0].likeCount).toBe(1)
+    })
+
+    it('再次 toggleLike 取消点赞', async () => {
+      useServer([{ id: 'p-1', content: '点赞对象', createdAt: 1700000000000 }])
+      const store = usePostsStore()
+      await store.hydrate()
+
+      await store.toggleLike('p-1')
+      await store.toggleLike('p-1')
+
+      expect(store.posts[0].liked).toBe(false)
+      expect(store.posts[0].likeCount).toBe(0)
+    })
+
+    it('toggleFavorite 收藏成功后更新本地状态', async () => {
+      useServer([{ id: 'p-1', content: '收藏对象', createdAt: 1700000000000 }])
+      const store = usePostsStore()
+      await store.hydrate()
+
+      const result = await store.toggleFavorite('p-1')
+
+      expect(result.ok).toBe(true)
+      expect(store.posts[0].favorited).toBe(true)
+      expect(store.posts[0].favoriteCount).toBe(1)
+    })
+
+    it('点赞与收藏互不影响', async () => {
+      useServer([{ id: 'p-1', content: '既赞又藏', createdAt: 1700000000000 }])
+      const store = usePostsStore()
+      await store.hydrate()
+
+      await store.toggleLike('p-1')
+      await store.toggleFavorite('p-1')
+
+      expect(store.posts[0].liked).toBe(true)
+      expect(store.posts[0].favorited).toBe(true)
+      expect(store.posts[0].likeCount).toBe(1)
+      expect(store.posts[0].favoriteCount).toBe(1)
+    })
+
+    it('未知 id 返回 NOT_FOUND 且不发请求', async () => {
+      const { fetchImpl } = useServer()
+      const store = usePostsStore()
+      await store.hydrate()
+
+      const result = await store.toggleLike('nope')
+
+      expect(result.ok).toBe(false)
+      expect(result.code).toBe('NOT_FOUND')
+      expect(fetchImpl).toHaveBeenCalledTimes(1)
+    })
+
+    it('服务端失败时状态保持不变', async () => {
+      useFetch(async (url, options = {}) => {
+        if (((options.method) || 'GET') === 'GET') {
+          return jsonResponse({ posts: [{ id: 'p-1', content: '点不了', createdAt: 1700000000000 }] })
+        }
+        return jsonResponse({ error: { code: 'INTERNAL_ERROR', message: '服务器内部错误' } }, 500)
+      })
+      const store = usePostsStore()
+      await store.hydrate()
+
+      const result = await store.toggleLike('p-1')
+
+      expect(result.ok).toBe(false)
+      expect(result.code).toBe('SERVER')
+      expect(store.posts[0].liked).toBe(false)
+    })
+
+    it('网络异常时返回 NETWORK 且状态不变', async () => {
+      useFetch(async (url, options = {}) => {
+        if (((options.method) || 'GET') === 'GET') {
+          return jsonResponse({ posts: [{ id: 'p-1', content: 'x', createdAt: 1700000000000 }] })
+        }
+        throw new Error('offline')
+      })
+      const store = usePostsStore()
+      await store.hydrate()
+
+      const result = await store.toggleFavorite('p-1')
+
+      expect(result.code).toBe('NETWORK')
+      expect(store.posts[0].favorited).toBe(false)
     })
   })
 

@@ -75,6 +75,18 @@ async function handleDelete(post) {
   toast.show('已删除', 'success')
 }
 
+/** 点赞 / 取消点赞：失败时仅提示，不改变卡片状态 */
+async function handleLike(post) {
+  const result = await store.toggleLike(post.id)
+  if (!result.ok) toast.show(result.message, 'error')
+}
+
+/** 收藏 / 取消收藏：失败时仅提示，不改变卡片状态 */
+async function handleFavorite(post) {
+  const result = await store.toggleFavorite(post.id)
+  if (!result.ok) toast.show(result.message, 'error')
+}
+
 onMounted(async () => {
   // 相对时间每分钟刷新一次，无需重绘整个列表
   clockTimer = window.setInterval(() => store.tick(), 60 * 1000)
@@ -133,6 +145,8 @@ onBeforeUnmount(() => {
           :now="now"
           :highlight="post.id === highlightId"
           @delete="handleDelete(post)"
+          @like="handleLike(post)"
+          @favorite="handleFavorite(post)"
         />
       </ol>
     </section>
