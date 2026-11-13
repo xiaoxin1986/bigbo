@@ -1,3 +1,11 @@
+# 依赖与构建产物
+node_modules/
+dist/
+coverage/
+
+# 验收截图与日志
+verify-output/
+
 # 本地编辑器与系统产物
 .vscode/
 .idea/
