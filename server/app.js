@@ -1,10 +1,32 @@
 import { Hono } from 'hono'
 
 import { createPostStore } from './store.js'
-import { validateCreatePayload } from './validation.js'
+import { validateCreatePayload, validateFavoritePayload, validateLikePayload } from './validation.js'
 
 /** 统一错误体，保证任何失败都是 JSON */
 const errorBody = (code, message) => ({ error: { code, message } })
+
+/**
+ * 解析请求体 JSON 对象：空体或非法 JSON 一律返回 { ok: false }，
+ * 由调用方决定映射为 400 INVALID_BODY。
+ * @param {import('hono').Context} c
+ * @returns {Promise<{ ok: true, payload: unknown } | { ok: false }>}
+ */
+async function readJsonObject(c) {
+  let rawText = ''
+  try {
+    rawText = await c.req.text()
+  } catch {
+    rawText = ''
+  }
+  const trimmed = rawText.trim()
+  if (trimmed === '') return { ok: false }
+  try {
+    return { ok: true, payload: JSON.parse(trimmed) }
+  } catch {
+    return { ok: false }
+  }
+}
 
 function uptimeSeconds() {
   const processObject = globalThis.process
@@ -43,26 +65,10 @@ export function createApp({ store } = {}) {
   })
 
   app.post('/api/posts', async (c) => {
-    let rawText = ''
-    try {
-      rawText = await c.req.text()
-    } catch {
-      rawText = ''
-    }
+    const parsed = await readJsonObject(c)
+    if (!parsed.ok) return c.json(errorBody('INVALID_BODY', '请求体必须是 JSON 对象'), 400)
 
-    const trimmed = rawText.trim()
-    if (trimmed === '') {
-      return c.json(errorBody('INVALID_BODY', '请求体必须是 JSON 对象'), 400)
-    }
-
-    let payload
-    try {
-      payload = JSON.parse(trimmed)
-    } catch {
-      return c.json(errorBody('INVALID_BODY', '请求体必须是 JSON 对象'), 400)
-    }
-
-    const result = validateCreatePayload(payload)
+    const result = validateCreatePayload(parsed.payload)
     if (!result.ok) return c.json(errorBody(result.code, result.message), 400)
 
     const post = postStore.create(result.value)
@@ -74,6 +80,30 @@ export function createApp({ store } = {}) {
     const removed = postStore.remove(c.req.param('id'))
     if (!removed) return c.json(errorBody('NOT_FOUND', '动态不存在'), 404)
     return c.body(null, 204)
+  })
+
+  app.put('/api/posts/:id/like', async (c) => {
+    const parsed = await readJsonObject(c)
+    if (!parsed.ok) return c.json(errorBody('INVALID_BODY', '请求体必须是 JSON 对象'), 400)
+
+    const result = validateLikePayload(parsed.payload)
+    if (!result.ok) return c.json(errorBody(result.code, result.message), 400)
+
+    const post = postStore.setLike(c.req.param('id'), result.value)
+    if (!post) return c.json(errorBody('NOT_FOUND', '动态不存在'), 404)
+    return c.json({ post })
+  })
+
+  app.put('/api/posts/:id/favorite', async (c) => {
+    const parsed = await readJsonObject(c)
+    if (!parsed.ok) return c.json(errorBody('INVALID_BODY', '请求体必须是 JSON 对象'), 400)
+
+    const result = validateFavoritePayload(parsed.payload)
+    if (!result.ok) return c.json(errorBody(result.code, result.message), 400)
+
+    const post = postStore.setFavorite(c.req.param('id'), result.value)
+    if (!post) return c.json(errorBody('NOT_FOUND', '动态不存在'), 404)
+    return c.json({ post })
   })
 
   return app

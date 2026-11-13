@@ -6,6 +6,8 @@ import {
   MAX_LENGTH,
   normalizeContent,
   validateCreatePayload,
+  validateFavoritePayload,
+  validateLikePayload,
 } from '../../server/validation.js'
 
 const failure = (payload) => {
@@ -181,5 +183,56 @@ describe('validateCreatePayload —— 结构非法', () => {
     const result = failure({ content: '有文字', image: { dataUrl } })
     expect(result.code).toBe('INVALID_BODY')
     expect(result.message).toBe('图片数据过大')
+  })
+})
+
+describe('validateLikePayload', () => {
+  it('liked 为 true / false 均通过', () => {
+    expect(validateLikePayload({ liked: true })).toEqual({ ok: true, value: true })
+    expect(validateLikePayload({ liked: false })).toEqual({ ok: true, value: false })
+  })
+
+  it.each([
+    ['缺失 liked', {}],
+    ['liked 为字符串', { liked: 'true' }],
+    ['liked 为数字', { liked: 1 }],
+    ['liked 为 null', { liked: null }],
+  ])('%s 时返回 INVALID_BODY', (_label, payload) => {
+    const result = validateLikePayload(payload)
+    expect(result.ok).toBe(false)
+    expect(result.code).toBe('INVALID_BODY')
+    expect(result.message).toBe('liked 必须是布尔值')
+  })
+
+  it('请求体非对象返回 INVALID_BODY', () => {
+    const result = validateLikePayload(null)
+    expect(result.ok).toBe(false)
+    expect(result.code).toBe('INVALID_BODY')
+    expect(result.message).toBe('请求体必须是 JSON 对象')
+  })
+})
+
+describe('validateFavoritePayload', () => {
+  it('favorited 为 true / false 均通过', () => {
+    expect(validateFavoritePayload({ favorited: true })).toEqual({ ok: true, value: true })
+    expect(validateFavoritePayload({ favorited: false })).toEqual({ ok: true, value: false })
+  })
+
+  it.each([
+    ['缺失 favorited', {}],
+    ['favorited 为字符串', { favorited: 'yes' }],
+    ['favorited 为数组', { favorited: [] }],
+  ])('%s 时返回 INVALID_BODY', (_label, payload) => {
+    const result = validateFavoritePayload(payload)
+    expect(result.ok).toBe(false)
+    expect(result.code).toBe('INVALID_BODY')
+    expect(result.message).toBe('favorited 必须是布尔值')
+  })
+
+  it('请求体是数组返回 INVALID_BODY', () => {
+    const result = validateFavoritePayload([])
+    expect(result.ok).toBe(false)
+    expect(result.code).toBe('INVALID_BODY')
+    expect(result.message).toBe('请求体必须是 JSON 对象')
   })
 })

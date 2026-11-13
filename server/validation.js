@@ -16,6 +16,8 @@ export const MESSAGES = {
   INVALID_CONTENT_TYPE: 'content 必须是字符串',
   INVALID_IMAGE: '图片数据不合法',
   IMAGE_TOO_LARGE: '图片数据过大',
+  INVALID_LIKE: 'liked 必须是布尔值',
+  INVALID_FAVORITE: 'favorited 必须是布尔值',
 }
 
 const fail = (code, message) => ({ ok: false, code, message })
@@ -93,4 +95,38 @@ export function validateCreatePayload(payload) {
   if (countChars(content) > MAX_LENGTH) return fail('TOO_LONG', MESSAGES.TOO_LONG)
 
   return { ok: true, value: { content, image } }
+}
+
+/**
+ * 校验布尔型反应字段（liked / favorited）。请求体必须是 JSON 对象，
+ * 目标字段必须是布尔值，否则返回对应的 INVALID_BODY。
+ * @param {unknown} payload 已 JSON.parse 的请求体
+ * @param {'liked' | 'favorited'} field
+ * @returns {{ ok: true, value: boolean } | { ok: false, code: string, message: string }}
+ */
+function validateBooleanField(payload, field) {
+  if (!isPlainObject(payload)) return fail('INVALID_BODY', MESSAGES.INVALID_BODY_OBJECT)
+
+  const value = payload[field]
+  if (typeof value !== 'boolean') {
+    return fail('INVALID_BODY', field === 'liked' ? MESSAGES.INVALID_LIKE : MESSAGES.INVALID_FAVORITE)
+  }
+
+  return { ok: true, value }
+}
+
+/**
+ * 校验 PUT /api/posts/:id/like 的请求体：{ liked: boolean }。
+ * @param {unknown} payload
+ */
+export function validateLikePayload(payload) {
+  return validateBooleanField(payload, 'liked')
+}
+
+/**
+ * 校验 PUT /api/posts/:id/favorite 的请求体：{ favorited: boolean }。
+ * @param {unknown} payload
+ */
+export function validateFavoritePayload(payload) {
+  return validateBooleanField(payload, 'favorited')
 }
