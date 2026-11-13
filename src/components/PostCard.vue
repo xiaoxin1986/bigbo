@@ -8,6 +8,8 @@ const props = defineProps({
   highlight: { type: Boolean, default: false },
 })
 
+const emit = defineEmits(['delete'])
+
 const relativeTime = computed(() => formatRelativeTime(props.post.createdAt, props.now))
 const absoluteTime = computed(() => formatDateTime(props.post.createdAt))
 const machineTime = computed(() => new Date(props.post.createdAt).toISOString())
@@ -33,7 +35,23 @@ const gradient = computed(() => avatarGradient(props.post.id))
           {{ relativeTime }}
         </time>
       </div>
+      <button
+        type="button"
+        class="post-card__delete"
+        data-test="delete-post"
+        :aria-label="`删除动态：${post.content || '图片动态'}`"
+        @click="emit('delete')"
+      >
+        删除
+      </button>
     </div>
-    <p class="post-card__content">{{ post.content }}</p>
+    <p v-if="post.content" class="post-card__content">{{ post.content }}</p>
+    <figure v-if="post.image" class="post-card__media">
+      <img
+        :src="post.image.dataUrl"
+        :alt="post.image.name || '动态配图'"
+        loading="lazy"
+      />
+    </figure>
   </li>
 </template>

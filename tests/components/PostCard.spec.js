@@ -67,4 +67,47 @@ describe('PostCard', () => {
   it('根节点携带动态 id，便于定位', () => {
     expect(mountCard().get('.post-card').attributes('data-id')).toBe(post.id)
   })
+
+  it('带图片的动态渲染图片', () => {
+    const wrapper = mountCard({
+      post: { ...post, image: { dataUrl: 'data:image/jpeg;base64,zzz', name: 'a.jpg' } },
+    })
+    const img = wrapper.get('.post-card__media img')
+    expect(img.attributes('src')).toBe('data:image/jpeg;base64,zzz')
+    expect(img.attributes('alt')).toBe('a.jpg')
+    expect(img.attributes('loading')).toBe('lazy')
+  })
+
+  it('无图片的动态不渲染媒体区域', () => {
+    expect(mountCard().find('.post-card__media').exists()).toBe(false)
+  })
+
+  it('纯图片动态省略空正文段落', () => {
+    const wrapper = mountCard({
+      post: { ...post, content: '', image: { dataUrl: 'data:image/jpeg;base64,zzz' } },
+    })
+    expect(wrapper.find('.post-card__content').exists()).toBe(false)
+    expect(wrapper.get('.post-card__media img').attributes('alt')).toBe('动态配图')
+  })
+
+  it('点击删除按钮触发 delete 事件', async () => {
+    const wrapper = mountCard()
+
+    await wrapper.get('[data-test="delete-post"]').trigger('click')
+
+    expect(wrapper.emitted('delete')).toHaveLength(1)
+  })
+
+  it('删除按钮带可读的无障碍标签', () => {
+    expect(mountCard().get('[data-test="delete-post"]').attributes('aria-label')).toBe(
+      `删除动态：${post.content}`,
+    )
+
+    const imageOnly = mountCard({
+      post: { ...post, content: '', image: { dataUrl: 'data:image/jpeg;base64,zzz' } },
+    })
+    expect(imageOnly.get('[data-test="delete-post"]').attributes('aria-label')).toBe(
+      '删除动态：图片动态',
+    )
+  })
 })

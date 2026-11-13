@@ -1,149 +1,203 @@
 # BigBo
 
-一个极简动态时间线应用：写下此刻的想法，内容立刻出现在时间线顶部，并保存在浏览器 `localStorage` 中，刷新或下次打开依然还在。
+一个极简动态时间线应用：写下此刻的想法，内容立刻出现在时间线顶部。
 
-本项目是原「纯 HTML + CSS + 原生 JS」版本的 **TDD 重写版**，技术栈换成 **Node.js + Vue 3 + Pinia + Vite**，数据存储仍然使用 Local Storage，并且沿用旧版的存储 key，历史数据可直接读取。
+本项目采用前后端分离结构：
+
+- **前端**：Vue 3 + Pinia + Vite，只负责渲染与交互；
+- **后端**：Hono + RESTful API + **内存存储**，负责校验、生成 id 与时间、保存数据。
+
+数据不再写入浏览器 `localStorage` —— 刷新、换标签页、换浏览器都能看到同一份数据（同一服务进程内）。
+
+> 内存存储意味着**服务进程重启后数据清空**，这是本项目的刻意取舍：无需数据库即可演示完整的 REST 生命周期。
 
 ## 快速开始
 
 ```bash
-npm install      # 安装依赖（Node.js >= 20.19）
-npm run dev      # 开发模式，默认 http://localhost:5173
-npm test         # 全量单元 / 组件测试（Vitest + jsdom）
-npm run build    # 生产构建，输出 dist/
-npm run preview  # 预览生产构建
-npm run verify:browser   # 真实浏览器端到端验收（需先启动 dev 或 preview）
+npm install                  # Node.js >= 20.19
+npm run dev                  # 同时启动 Hono(8787) 与 Vite(5173)，打开 http://localhost:5173
+npm run dev:web              # 只启动前端（需另行启动后端）
+npm run dev:server           # 只启动后端，--watch 热重启
+npm run build                # 构建前端到 dist/
+npm start                    # Hono 同时托管 dist 与 /api，打开 http://localhost:8787
+npm test                     # 全量测试：前端 jsdom + 后端 node
+npm run test:server          # 只跑后端测试
+npm run verify:browser       # 真实浏览器端到端验收（需先 npm run build && npm start）
 ```
+
+开发模式下 Vite 通过 `/api` 代理把请求转发到 `http://localhost:8787`（见 `vite.config.js`），因此前端代码里始终只写相对路径。
 
 ## 功能
 
 | 功能 | 说明 |
 | --- | --- |
-| 发布动态 | 点击「发布」或按 `Ctrl / ⌘ + Enter`，内容立即出现在时间线顶部 |
-| 时间线查看 | 按发布时间倒序展示，包含稳定渐变头像、作者、相对时间与正文 |
-| 本地持久化 | 数据以 JSON 存放在 `localStorage`，刷新、关闭重开、新标签页均可见 |
-| 输入校验 | 空白内容不可发布；实时字数统计，280 字上限，接近上限变橙、达上限变红 |
+| 发布动态 | 点击「发布」或按 `Ctrl / ⌘ + Enter`，请求成功后才出现在时间线顶部 |
+| 删除动态 | 卡片右上角「删除」，服务端删除成功后才从列表移除 |
+| 时间线查看 | 按 `createdAt` 倒序展示，包含稳定渐变头像、作者、相对时间与正文 |
+| 服务端持久化 | 数据保存在 Hono 进程内存中，刷新 / 新标签页 / 换浏览器均可见 |
+| 输入校验 | 空白内容不可发布；前端实时字数统计（280 上限），服务端再做一次权威校验 |
+| 图片动态 | 支持 JPG / PNG / GIF / WebP，浏览器侧压缩后以 data URL 提交 |
 | 空状态引导 | 无动态时展示引导卡片，点击按钮聚焦输入框 |
-| 交互反馈 | 发布成功 / 失败均有底部 Toast；新卡片带入场动画；相同提示不重复堆叠 |
-| 异常兜底 | JSON 损坏、隐私模式、配额超限都不会白屏，会降级并明确提示 |
+| 加载与异常 | 首屏展示加载态；服务端不可用时降级为空时间线并明确提示 |
+| 交互反馈 | 发布 / 删除成功失败均有底部 Toast；新卡片带入场动画；相同提示不重复堆叠 |
 | 响应式 | 桌面端 640px 居中单列，移动端全宽卡片，适配 `prefers-reduced-motion` |
+
+## RESTful API
+
+基地址 `/api`，请求与响应均为 JSON（`DELETE` 成功为 204 无正文）。统一错误体：
+
+```json
+{ "error": { "code": "TOO_LONG", "message": "内容超出 280 字上限" } }
+```
+
+| 方法与路径 | 请求体 | 成功 | 失败 |
+| --- | --- | --- | --- |
+| `GET /api/health` | — | `200 { status: "ok", uptime }` | — |
+| `GET /api/posts` | — | `200 { posts: Post[] }`，`createdAt` 倒序 | — |
+| `GET /api/posts/:id` | — | `200 { post: Post }` | `404 NOT_FOUND` |
+| `POST /api/posts` | `{ content?: string, image?: { dataUrl, name? } }` | `201 { post: Post }` + `Location` | `400 EMPTY / TOO_LONG / INVALID_BODY` |
+| `DELETE /api/posts/:id` | — | `204` | `404 NOT_FOUND` |
+| 其他 `/api/*` | — | — | `404 NOT_FOUND`（JSON） |
+
+服务端规则：
+
+1. `content` 统一 `trim()`，字符数按 Unicode 码点计（emoji 计 1 个），上限 280；
+2. 「无正文且无图片」返回 `EMPTY`；超过上限返回 `TOO_LONG`；
+3. `id` 由服务端 `crypto.randomUUID()` 生成，`createdAt` 由服务端时间生成，客户端不可指定；
+4. `image.dataUrl` 超过 4,000,000 字符视为非法；
+5. 所有路径（含未知路由）都返回 JSON，不会漏出 Hono 默认的纯文本 404。
 
 ## TDD 实施过程
 
-整个改写严格遵循 Red → Green → Refactor，每一层都是先写测试、确认失败、再写实现。
+整个改造遵循 Red → Green → Refactor，前后端各由一名子代理完成「先写测试、再写实现」，主会话负责契约设计、落盘、Code Review 与真实浏览器验收。
 
 | 阶段 | 先写的测试 | 初始状态 | 实现后 |
 | --- | --- | --- | --- |
-| 1. 纯函数层 | `tests/lib/time.spec.js`（17 例）、`tests/lib/id.spec.js`（4 例） | 模块不存在，3 个测试文件全红 | 全绿 |
-| 2. 仓储层 | `tests/lib/storage.spec.js`（14 例） | 同上 | 全绿 |
-| 3. 状态层 | `tests/stores/posts.spec.js`（15 例） | 同上 | 全绿 |
-| 4. 组件层 | `tests/components/*.spec.js`、`tests/composables/useToast.spec.js`（47 例） | 6 个测试文件找不到实现而失败 | 全绿 |
-| 5. 端到端 | `scripts/verify-browser.mjs`（47 项断言） | — | 47 / 47 通过 |
+| 1. 后端纯函数层 | `tests/server/validation.spec.js`（32 例） | 3 个后端 spec 文件全部因模块缺失而失败 | 全绿 |
+| 2. 后端存储层 | `tests/server/store.spec.js`（17 例） | 同上 | 全绿 |
+| 3. 后端 HTTP 层 | `tests/server/api.spec.js`（32 例） | 同上 | 全绿 |
+| 4. 前端 API 客户端 | `tests/lib/api.spec.js`（25 例） | 前端新测试 15 例失败、2 个测试文件无法加载 | 全绿 |
+| 5. 前端状态与组件 | `tests/stores/posts.spec.js`、`tests/components/App.spec.js` 等 | 同上 | 全绿 |
+| 6. 端到端 | `scripts/verify-browser.mjs`（59 项断言） | — | 59 / 59 通过 |
 
 当前验收结果：
 
-- 单元 / 组件测试：**97 例全部通过**（10 个测试文件）
+- 单元 / 集成测试：**218 例全部通过**（13 个测试文件，其中后端 81 例跑在 node 环境）
 - 生产构建：`vite build` 通过
-- 真实浏览器（本机 Chrome，Playwright 驱动）：**47 项断言全部通过**，并输出桌面端 / 移动端截图到 `verify-output/`
+- 真实浏览器（本机 Chrome，Playwright 驱动）+ 真实后端：**59 项断言全部通过**，输出桌面端 / 移动端截图到 `verify-output/`
 
 ## 目录结构
 
 ```
 bigbo/
-├── index.html                     # Vite 入口，挂载 #app
-├── vite.config.js                 # Vite + Vitest 统一配置
-├── package.json
+├── index.html                     # Vite 入口
+├── vite.config.js                 # Vite + Vitest 配置，含 /api 代理
+├── server/                        # 后端（Hono）
+│   ├── app.js                     # 纯 API 应用：路由 / 校验编排 / 统一错误
+│   ├── validation.js              # 请求体校验与归一化（纯函数）
+│   ├── store.js                   # 内存存储：list / get / create / remove / clear
+│   └── index.js                   # 入口：监听端口 + 托管 dist 静态资源
 ├── src/
 │   ├── main.js                    # createApp + createPinia
-│   ├── App.vue                    # 编排：恢复数据、发布、Toast、每分钟刷新时间
+│   ├── App.vue                    # 编排：加载、发布、删除、Toast、每分钟刷新时间
 │   ├── styles.css                 # 设计令牌 / 玻璃拟态 / 动效 / 响应式
 │   ├── components/
-│   │   ├── AppHeader.vue          # 品牌栏 + 本地存储徽标
-│   │   ├── PostComposer.vue       # 受控输入、字数统计、快捷键、发布按钮
-│   │   ├── PostCard.vue           # 单条动态（相对时间由 now 驱动）
+│   │   ├── AppHeader.vue          # 品牌栏 + 服务端存储徽标
+│   │   ├── PostComposer.vue       # 受控输入、字数统计、快捷键、图片选择
+│   │   ├── PostCard.vue           # 单条动态 + 删除按钮
 │   │   ├── EmptyState.vue         # 空状态引导
 │   │   └── ToastStack.vue         # 底部提示容器（aria-live）
 │   ├── composables/
 │   │   └── useToast.js            # Toast 队列：自动消失、去重、上限 3 条
 │   ├── lib/
-│   │   ├── time.js                # 字符计数、时间格式化、头像渐变（纯函数）
-│   │   ├── id.js                  # crypto.randomUUID + 兜底
-│   │   └── storage.js             # localStorage 仓储：读写、结构校验、异常降级
+│   │   ├── api.js                 # API 客户端：请求、结构校验、错误收敛
+│   │   ├── image.js               # 图片读取 / 压缩 / 校验
+│   │   └── time.js                # 字符计数、时间格式化、头像渐变（纯函数）
 │   └── stores/
-│       └── posts.js               # Pinia store：posts / sortedPosts / publish / hydrate
-├── tests/                         # 与 src 结构镜像的测试
-│   ├── lib/  stores/  components/  composables/
-│   └── setup.js                   # 每个用例前后清空 localStorage
+│       └── posts.js               # Pinia store：posts / hydrate / publish / remove
+├── tests/
+│   ├── server/                    # 后端测试（node 环境）
+│   ├── lib/  stores/  components/ composables/   # 前端测试（jsdom）
+│   └── setup.js                   # 环境兼容的全局清理（localStorage / 全局替身）
 ├── scripts/
-│   └── verify-browser.mjs         # 真实浏览器端到端验收
+│   ├── dev.mjs                    # 一条命令同时启动前后端
+│   └── verify-browser.mjs         # 真实浏览器 + 真实后端验收
 └── README.md
 ```
 
 ## 架构与数据流
 
 ```
-组件事件 → App.handleSubmit → store.publish(content)
-                                 ├─ 校验（EMPTY / TOO_LONG）
-                                 ├─ writePosts() 先落盘
-                                 └─ 成功后更新内存状态（失败则回滚）
+组件事件 → App.handleSubmit → store.publish(content, { image })
+                                 ├─ 本地校验（EMPTY / TOO_LONG，避免无谓请求）
+                                 ├─ apiClient.createPost()  →  POST /api/posts
+                                 │      ├─ 服务端再校验一次并生成 id / createdAt
+                                 │      └─ 写入内存 store
+                                 └─ 成功后才更新内存状态（失败则什么都不改）
                                           ↓
                     sortedPosts（倒序派生）→ PostCard 列表重绘
 ```
 
-- **lib 层**：纯函数与 localStorage 适配，不依赖 Vue，可单独测试；所有存储异常收敛为 `{ ok, reason }`。
-- **stores 层**：Pinia setup store，唯一数据源；`publish` 采用「先落盘、后更新内存」的顺序，写入失败不会污染界面状态。
-- **组件层**：`PostComposer` 是受控组件（`v-model`），只负责交互与展示，业务规则集中在 store。
-- **时间刷新**：store 维护 `now`，`App` 每 60 秒调用 `tick()`，卡片相对时间随之更新，无需重载列表。
+- **server 层**：`validation.js` 是纯函数，`store.js` 只管内存读写（可注入 `now` / `createId` 便于测试），`app.js` 只做路由编排，`index.js` 才碰端口与文件系统 —— 因此 API 测试不需要起服务器。
+- **前端 lib 层**：`api.js` 把网络异常、非 JSON 响应、结构非法的条目全部收敛成 `{ ok, code | reason }`，上层不需要 `try/catch`。
+- **stores 层**：唯一数据源。`hydrate` / `publish` / `remove` 都是「服务端成功 → 再改内存」，不会出现「界面看得到、服务端没存下」的脏状态。
+- **组件层**：`PostComposer` 是受控组件，只负责交互与展示；`App` 负责把结果翻译成 Toast。
 
 ## 数据结构
 
-`localStorage` key 与旧版一致：`bigbo.posts.v1`
+后端内存中的一条动态：
 
 ```json
-[
-  {
-    "id": "b3f1c8a2-4d7e-4a91-9c3f-0a6b2e5d7f10",
-    "content": "今天把 BigBo 跑起来了",
-    "createdAt": 1763001600000
-  }
-]
+{
+  "id": "b3f1c8a2-4d7e-4a91-9c3f-0a6b2e5d7f10",
+  "content": "今天把 BigBo 跑起来了",
+  "createdAt": 1763001600000,
+  "image": { "dataUrl": "data:image/jpeg;base64,...", "name": "photo.jpg" }
+}
 ```
 
 | 字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `id` | string | 唯一标识，优先 `crypto.randomUUID()`，不可用时时间戳 + 随机数兜底 |
-| `content` | string | 纯文本正文，渲染时仅通过插值 / `textContent` 写入 |
-| `createdAt` | number | 创建时间毫秒时间戳，用于倒序与相对时间 |
+| `id` | string | 服务端生成的 UUID |
+| `content` | string | 纯文本正文，渲染时仅通过插值写入 |
+| `createdAt` | number | 服务端毫秒时间戳，用于倒序与相对时间 |
+| `image` | object? | 可选；纯图片动态允许 `content` 为空串 |
 
-读取时逐条校验字段类型，非法条目被过滤；JSON 损坏或顶层非数组时整体降级为空列表并给出提示。
+前端还会对服务端返回的每条记录做一次结构校验：缺 `id`、`createdAt` 非有限数字、`image` 缺 `dataUrl` 的条目会被直接丢弃，避免一条脏数据拖垮整个列表。
 
 ## 错误处理矩阵
 
 | 场景 | 代码位置 | 行为 |
 | --- | --- | --- |
-| 空白内容 | `store.publish` → `EMPTY` | 提示「先写点什么再发布吧」，面板输入保留 |
-| 超过 280 字 | `store.publish` → `TOO_LONG` | 提示「内容超出 280 字上限」，不落盘（输入框另有原生 `maxlength` 兜底） |
-| 写入失败 | `store.publish` → `STORAGE` | 提示「本地存储不可用，内容未能保存」，内存状态回滚、输入保留 |
-| 数据损坏 | `store.hydrate` / `readPosts` | 提示「读取本地数据失败，已从空白开始」，页面正常可用 |
-| 存储不可访问 | `readPosts` / `writePosts` | 返回 `{ ok: false, reason: 'unavailable' }`，不抛异常 |
+| 空白内容 | `store.publish` → `EMPTY` | 提示「先写点什么再发布吧」，不发请求，输入保留 |
+| 超过 280 字 | `store.publish` → `TOO_LONG` | 提示「内容超出 280 字上限」，不发请求 |
+| 服务端拒绝 | `api.createPost` 透传 `EMPTY/TOO_LONG/INVALID_BODY` | 直接展示服务端文案，本地状态不变 |
+| 服务端不可用 | `api.createPost` → `NETWORK` | 提示「服务端不可用，内容未能保存」，输入与图片保留 |
+| 加载失败 | `store.hydrate` → `recovered` | 提示「读取服务端数据失败，已从空白开始」，页面仍可用 |
+| 删除失败 | `api.deletePost` → `NETWORK / NOT_FOUND` | 提示「删除失败，请稍后重试」，卡片保留 |
+| 未知 API 路由 | `server/app.js` → `notFound` | `404` + JSON 错误体 |
+| 服务端异常 | `server/app.js` → `onError` | `500` + JSON 错误体，进程不崩 |
 
 ## 测试与验收
 
 ```bash
-npm test                 # 97 例：lib 35 + store 15 + 组件/组合式 47
+npm test                 # 218 例：后端 81 + 前端 137
 npm run build            # 生产构建
-npm run dev              # 另开终端
-npm run verify:browser   # 47 项浏览器断言（自动复用本机 Chrome / Edge）
+npm start                # 另开终端，启动 8787（同时托管 dist）
+npm run verify:browser   # 59 项断言（真实 Chrome + 真实后端）
 ```
 
-浏览器验收覆盖：空状态、发布与倒序、`Ctrl+Enter`、输入清空、计数、Toast 样式与去重、`localStorage` 内容结构、刷新与新标签页持久化、字数上限与 85% 预警、emoji 计数、HTML 注入防护、损坏数据降级、空状态聚焦、移动端不横向溢出、控制台无报错，并输出 `verify-output/*.png` 截图。
+后端测试直接调用 `app.request()`，不需要监听端口；前端测试用 `vi.stubGlobal('fetch', ...)` 提供内存型假服务端。
+
+浏览器验收覆盖：健康检查、空状态、发布与倒序、`Ctrl+Enter`、输入清空、计数、Toast 样式与去重、服务端数据与界面一致性、`Location` 头、`400 EMPTY / TOO_LONG`、`404 NOT_FOUND`、JSON 错误体、刷新与新标签页共享、字数上限与 85% 预警、emoji 计数、HTML 注入防护、删除与刷新后不复活、空状态聚焦、移动端不横向溢出、控制台无报错，并输出 `verify-output/*.png` 截图。
 
 ## 安全说明
 
 - 正文通过 Vue 插值渲染，不存在 `v-html` / `innerHTML` 拼接，天然免疫脚本注入；
+- 服务端只接受已知字段，并对类型、长度、图片 dataUrl 做显式校验；
 - 不使用 `eval`、`new Function`；
-- 无任何后端请求，数据只留在当前浏览器。
+- 无鉴权与多用户隔离，纯本地演示用途。
 
 ## 浏览器兼容
 
-面向现代常青浏览器（Chrome / Edge / Firefox / Safari 近两年版本）。`crypto.randomUUID` 不可用时会自动退回兜底 id 生成策略。
+面向现代常青浏览器（Chrome / Edge / Firefox / Safari 近两年版本）。后端要求 Node.js >= 20.19（`crypto.randomUUID`、内置 `fetch`）。

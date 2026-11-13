@@ -5,16 +5,16 @@
    ========================================================================== */
 
 :root {
-  /* 主色 */
-  --color-primary: #6366f1;
-  --color-primary-2: #8b5cf6;
-  --color-primary-3: #a78bfa;
-  --gradient-primary: linear-gradient(135deg, #6366f1 0%, #8b5cf6 55%, #a78bfa 100%);
+  /* 主色 · 中国移动品牌色（蓝 + 绿） */
+  --color-primary: #0084ce;
+  --color-primary-2: #006ba8;
+  --color-primary-3: #8cc518;
+  --gradient-primary: linear-gradient(135deg, #0084ce 0%, #8cc518 100%);
 
   /* 背景与表面 */
-  --color-bg: #f5f6fa;
+  --color-bg: #f4f8fb;
   --color-surface: #ffffff;
-  --color-surface-soft: #eef1f8;
+  --color-surface-soft: #eaf3f8;
 
   /* 文字 */
   --color-text: #0f172a;
@@ -28,11 +28,11 @@
 
   /* 描边与阴影 */
   --color-border: rgba(15, 23, 42, 0.07);
-  --color-border-strong: rgba(99, 102, 241, 0.32);
+  --color-border-strong: rgba(0, 132, 206, 0.32);
   --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.04), 0 2px 8px rgba(15, 23, 42, 0.04);
-  --shadow-md: 0 4px 12px rgba(15, 23, 42, 0.06), 0 12px 32px rgba(79, 70, 229, 0.08);
-  --shadow-lg: 0 8px 20px rgba(15, 23, 42, 0.08), 0 24px 56px rgba(79, 70, 229, 0.12);
-  --shadow-glow: 0 0 0 4px rgba(99, 102, 241, 0.12);
+  --shadow-md: 0 4px 12px rgba(15, 23, 42, 0.06), 0 12px 32px rgba(0, 107, 168, 0.08);
+  --shadow-lg: 0 8px 20px rgba(15, 23, 42, 0.08), 0 24px 56px rgba(0, 107, 168, 0.12);
+  --shadow-glow: 0 0 0 4px rgba(0, 132, 206, 0.12);
 
   /* 尺寸 */
   --radius-sm: 10px;
@@ -121,7 +121,7 @@ button {
   height: 46vw;
   min-width: 320px;
   min-height: 320px;
-  background: radial-gradient(circle at 30% 30%, rgba(129, 140, 248, 0.85), rgba(99, 102, 241, 0));
+  background: radial-gradient(circle at 30% 30%, rgba(56, 165, 219, 0.85), rgba(0, 132, 206, 0));
 }
 
 .aurora__blob--two {
@@ -131,7 +131,7 @@ button {
   height: 42vw;
   min-width: 280px;
   min-height: 280px;
-  background: radial-gradient(circle at 60% 40%, rgba(167, 139, 250, 0.75), rgba(139, 92, 246, 0));
+  background: radial-gradient(circle at 60% 40%, rgba(163, 213, 46, 0.7), rgba(140, 197, 24, 0));
   animation-duration: 26s;
   animation-delay: -6s;
 }
@@ -206,7 +206,7 @@ button {
   color: #fff;
   letter-spacing: 0.02em;
   background: var(--gradient-primary);
-  box-shadow: 0 6px 16px rgba(99, 102, 241, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  box-shadow: 0 6px 16px rgba(0, 132, 206, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.35);
 }
 
 .brand__text {
@@ -219,7 +219,7 @@ button {
   font-size: 20px;
   font-weight: 700;
   letter-spacing: -0.01em;
-  background: linear-gradient(120deg, #4f46e5, #8b5cf6 60%, #a78bfa);
+  background: linear-gradient(120deg, #006ba8, #0084ce 55%, #6fa00f);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -238,10 +238,10 @@ button {
   padding: 6px 12px;
   font-size: 12px;
   font-weight: 500;
-  color: #4f46e5;
+  color: #0072b8;
   white-space: nowrap;
-  background: rgba(99, 102, 241, 0.09);
-  border: 1px solid rgba(99, 102, 241, 0.16);
+  background: rgba(0, 132, 206, 0.09);
+  border: 1px solid rgba(0, 132, 206, 0.16);
   border-radius: var(--radius-pill);
 }
 
@@ -300,14 +300,14 @@ button {
   font-weight: 600;
   color: #fff;
   background: var(--gradient-primary);
-  box-shadow: 0 4px 10px rgba(99, 102, 241, 0.28);
+  box-shadow: 0 4px 10px rgba(0, 132, 206, 0.28);
 }
 
 .avatar--self {
   background:
     radial-gradient(circle at 30% 25%, rgba(255, 255, 255, 0.55), transparent 55%),
     var(--gradient-primary);
-  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.9), 0 4px 14px rgba(99, 102, 241, 0.32);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.9), 0 4px 14px rgba(0, 132, 206, 0.32);
 }
 
 .composer__field {
@@ -338,6 +338,78 @@ button {
   margin-top: 6px;
   font-size: 12px;
   color: var(--color-text-faint);
+}
+
+.composer__preview {
+  position: relative;
+  display: inline-block;
+  margin-top: 12px;
+}
+
+.composer__preview img {
+  display: block;
+  max-width: 220px;
+  max-height: 180px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  object-fit: cover;
+}
+
+.composer__remove {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  font-size: 12px;
+  line-height: 1;
+  color: #fff;
+  background: rgba(15, 23, 42, 0.55);
+  border: 0;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: background-color 0.18s var(--ease-out);
+}
+
+.composer__remove:hover {
+  background: rgba(15, 23, 42, 0.75);
+}
+
+.composer__actions {
+  display: inline-flex;
+  align-items: center;
+}
+
+.composer__attach {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #0072b8;
+  background: rgba(0, 132, 206, 0.08);
+  border: 1px solid rgba(0, 132, 206, 0.18);
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  transition: background-color 0.18s var(--ease-out);
+}
+
+.composer__attach:hover:not(:disabled) {
+  background: rgba(0, 132, 206, 0.14);
+}
+
+.composer__attach:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.composer__attach svg {
+  width: 16px;
+  height: 16px;
 }
 
 .composer__footer {
@@ -398,7 +470,7 @@ button {
 }
 
 .btn:focus-visible {
-  outline: 2px solid #4f46e5;
+  outline: 2px solid #0072b8;
   outline-offset: 3px;
 }
 
@@ -406,12 +478,12 @@ button {
   color: #fff;
   background: var(--gradient-primary);
   background-size: 160% 160%;
-  box-shadow: 0 6px 18px rgba(99, 102, 241, 0.34);
+  box-shadow: 0 6px 18px rgba(0, 132, 206, 0.34);
 }
 
 .btn--primary:hover:not(:disabled) {
   transform: translateY(-2px);
-  box-shadow: 0 10px 24px rgba(99, 102, 241, 0.42);
+  box-shadow: 0 10px 24px rgba(0, 132, 206, 0.42);
   background-position: 100% 50%;
 }
 
@@ -432,13 +504,13 @@ button {
 }
 
 .btn--ghost {
-  color: #4f46e5;
-  background: rgba(99, 102, 241, 0.1);
-  border: 1px solid rgba(99, 102, 241, 0.18);
+  color: #0072b8;
+  background: rgba(0, 132, 206, 0.1);
+  border: 1px solid rgba(0, 132, 206, 0.18);
 }
 
 .btn--ghost:hover {
-  background: rgba(99, 102, 241, 0.16);
+  background: rgba(0, 132, 206, 0.16);
   transform: translateY(-1px);
 }
 
@@ -480,8 +552,8 @@ button {
   padding: 2px 9px;
   font-size: 12px;
   font-weight: 500;
-  color: #6d28d9;
-  background: rgba(139, 92, 246, 0.12);
+  color: #5b8a06;
+  background: rgba(140, 197, 24, 0.16);
   border-radius: var(--radius-pill);
 }
 
@@ -506,7 +578,7 @@ button {
 
 .post-card:hover {
   transform: translateY(-2px);
-  border-color: rgba(99, 102, 241, 0.18);
+  border-color: rgba(0, 132, 206, 0.18);
   box-shadow: var(--shadow-md);
 }
 
@@ -537,6 +609,65 @@ button {
   line-height: 1.35;
 }
 
+/* 删除按钮：默认低调，卡片悬停 / 键盘聚焦时才明显，避免干扰阅读 */
+.post-card__delete {
+  margin-left: auto;
+  padding: 5px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-text-faint);
+  cursor: pointer;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-pill);
+  opacity: 0.6;
+  transition: color 0.2s var(--ease-out), background-color 0.2s var(--ease-out),
+    border-color 0.2s var(--ease-out), opacity 0.2s var(--ease-out);
+}
+
+.post-card:hover .post-card__delete,
+.post-card__delete:focus-visible {
+  opacity: 1;
+}
+
+.post-card__delete:hover {
+  color: var(--color-danger);
+  background: rgba(239, 68, 68, 0.08);
+  border-color: rgba(239, 68, 68, 0.22);
+}
+
+.post-card__delete:focus-visible {
+  outline: 2px solid var(--color-border-strong);
+  outline-offset: 2px;
+}
+
+.feed__loading {
+  margin: 28px 0;
+  font-size: 13px;
+  color: var(--color-text-faint);
+  text-align: center;
+  letter-spacing: 0.02em;
+  animation: loadingPulse 1.4s ease-in-out infinite;
+}
+
+@keyframes loadingPulse {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .post-card__delete,
+  .feed__loading {
+    transition: none;
+    animation: none;
+  }
+}
+
 .post-card__author {
   font-size: 14px;
   font-weight: 600;
@@ -558,6 +689,19 @@ button {
   word-break: break-word;
 }
 
+.post-card__media {
+  margin: 12px 0 0;
+}
+
+.post-card__media img {
+  display: block;
+  max-width: 100%;
+  max-height: 420px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  object-fit: cover;
+}
+
 /* --------------------------------------------------------------------------
    空状态
    -------------------------------------------------------------------------- */
@@ -569,7 +713,7 @@ button {
   padding: 46px 24px 50px;
   text-align: center;
   background: rgba(255, 255, 255, 0.7);
-  border: 1px dashed rgba(99, 102, 241, 0.26);
+  border: 1px dashed rgba(0, 132, 206, 0.26);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-sm);
   animation: fadeIn 0.4s var(--ease-out) both;
@@ -594,7 +738,7 @@ button {
   width: 64px;
   height: 64px;
   color: var(--color-primary);
-  background: linear-gradient(150deg, rgba(99, 102, 241, 0.14), rgba(167, 139, 250, 0.1));
+  background: linear-gradient(150deg, rgba(0, 132, 206, 0.14), rgba(140, 197, 24, 0.12));
   border-radius: 20px;
 }
 

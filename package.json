@@ -2,18 +2,24 @@
   "name": "bigbo",
   "version": "2.0.0",
   "private": true,
-  "description": "BigBo —— 极简动态时间线，Vue 3 + Pinia 实现，数据保存在浏览器 localStorage",
+  "description": "BigBo —— 极简动态时间线，Vue 3 + Pinia 前端 + Hono RESTful API 后端（内存存储）",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "node scripts/dev.mjs",
+    "dev:web": "vite",
+    "dev:server": "node --watch server/index.js",
+    "start": "node server/index.js",
     "build": "vite build",
-    "preview": "vite preview",
+    "preview": "node server/index.js",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:server": "vitest run tests/server",
     "verify": "npm run test && npm run build",
     "verify:browser": "node scripts/verify-browser.mjs"
   },
   "dependencies": {
+    "@hono/node-server": "^2.1.8",
+    "hono": "^4.13.18",
     "pinia": "^3.0.1",
     "vue": "^3.5.13"
   },

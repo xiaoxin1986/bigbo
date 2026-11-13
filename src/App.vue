@@ -11,17 +11,15 @@ import { useToast } from './composables/useToast.js'
 import { RECOVERED_MESSAGE, usePostsStore } from './stores/posts.js'
 
 const store = usePostsStore()
-const { sortedPosts, postCount, now, isEmpty } = storeToRefs(store)
+const { sortedPosts, postCount, now, isEmpty, isLoading } = storeToRefs(store)
 
 const toast = useToast()
 const { toasts } = toast
 
-// 首次渲染前同步恢复本地数据，避免空状态闪烁
-const hydrateResult = store.hydrate()
-if (!hydrateResult.ok) toast.show(RECOVERED_MESSAGE, 'error')
-
 const draft = ref('')
+const image = ref(null)
 const highlightId = ref('')
+const submitting = ref(false)
 const composerRef = ref(null)
 const listRef = ref(null)
 
@@ -37,27 +35,53 @@ function focusComposer() {
 }
 
 async function handleSubmit(content) {
-  const result = store.publish(content)
+  // 请求在飞的时候忽略重复提交，避免网络慢时连点发出多条
+  if (submitting.value) return
+  submitting.value = true
+
+  try {
+    const result = await store.publish(content, { image: image.value })
+
+    if (!result.ok) {
+      toast.show(result.message, 'error')
+      // 失败时保留用户输入与图片，只把焦点交还输入框
+      focusComposer()
+      return
+    }
+
+    draft.value = ''
+    image.value = null
+    highlightId.value = result.post.id
+    toast.show('发布成功', 'success')
+
+    await nextTick()
+    const firstCard = listRef.value?.querySelector('.post-card')
+    firstCard?.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' })
+  } finally {
+    submitting.value = false
+  }
+}
+
+/** 删除单条动态：服务端删除成功后才更新本地列表 */
+async function handleDelete(post) {
+  const result = await store.remove(post.id)
 
   if (!result.ok) {
-    toast.show(result.message, 'error')
-    // 失败时保留用户输入，只把焦点交还输入框
-    focusComposer()
+    toast.show('删除失败，请稍后重试', 'error')
     return
   }
 
-  draft.value = ''
-  highlightId.value = result.post.id
-  toast.show('发布成功', 'success')
-
-  await nextTick()
-  const firstCard = listRef.value?.querySelector('.post-card')
-  firstCard?.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' })
+  if (highlightId.value === post.id) highlightId.value = ''
+  toast.show('已删除', 'success')
 }
 
-onMounted(() => {
+onMounted(async () => {
   // 相对时间每分钟刷新一次，无需重绘整个列表
   clockTimer = window.setInterval(() => store.tick(), 60 * 1000)
+
+  // 首屏数据来自服务端，失败时降级为空白时间线
+  const result = await store.hydrate()
+  if (!result.ok) toast.show(RECOVERED_MESSAGE, 'error')
 })
 
 onBeforeUnmount(() => {
@@ -76,7 +100,13 @@ onBeforeUnmount(() => {
   <AppHeader />
 
   <main class="layout">
-    <PostComposer ref="composerRef" v-model="draft" @submit="handleSubmit" />
+    <PostComposer
+      ref="composerRef"
+      v-model="draft"
+      v-model:image="image"
+      @submit="handleSubmit"
+      @image-error="(message) => toast.show(message, 'error')"
+    />
 
     <section class="feed" id="feed" aria-labelledby="feed-title">
       <div class="feed__header">
@@ -84,7 +114,9 @@ onBeforeUnmount(() => {
         <span class="feed__count" data-test="feed-count">{{ postCount }} 条</span>
       </div>
 
-      <EmptyState v-if="isEmpty" @compose="focusComposer" />
+      <p v-if="isLoading" class="feed__loading" data-test="feed-loading">正在加载…</p>
+
+      <EmptyState v-else-if="isEmpty" @compose="focusComposer" />
 
       <ol
         v-else
@@ -100,13 +132,14 @@ onBeforeUnmount(() => {
           :post="post"
           :now="now"
           :highlight="post.id === highlightId"
+          @delete="handleDelete(post)"
         />
       </ol>
     </section>
 
     <footer class="site-footer">
-      <p>BigBo · 纯前端演示项目，数据仅存储于当前浏览器</p>
-      <p class="site-footer__stack">Vue 3 · Pinia · Local Storage</p>
+      <p>BigBo · 数据保存在服务端内存，重启即清空</p>
+      <p class="site-footer__stack">Vue 3 · Pinia · Hono · 内存存储</p>
     </footer>
   </main>
 

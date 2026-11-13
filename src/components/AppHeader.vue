@@ -8,7 +8,7 @@
           <span class="brand__slogan">记录此刻，分享所想</span>
         </span>
       </a>
-      <span class="storage-badge" title="所有内容仅保存在当前浏览器中">
+      <span class="storage-badge" title="所有内容保存在服务端内存中">
         <svg class="storage-badge__icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
           <path
             d="M4 7.5C4 5.57 7.58 4 12 4s8 1.57 8 3.5S16.42 11 12 11 4 9.43 4 7.5Z"
@@ -29,7 +29,7 @@
             stroke-linecap="round"
           />
         </svg>
-        本地存储
+        服务端存储
       </span>
     </div>
   </header>
