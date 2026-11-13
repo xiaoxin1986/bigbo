@@ -23,7 +23,7 @@ let client = apiClient
 
 /**
  * 替换 store 使用的 API 客户端（仅供测试），传 null 恢复默认。
- * @param {{ listPosts: Function, createPost: Function, deletePost: Function } | null} next
+ * @param {{ listPosts: Function, createPost: Function, deletePost: Function, setLike: Function, setFavorite: Function } | null} next
  */
 export function setApiClient(next) {
   client = next ?? apiClient

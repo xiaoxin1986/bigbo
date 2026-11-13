@@ -133,10 +133,12 @@ describe('PostCard', () => {
     expect(wrapper.get('[data-test="like-count"]').text()).toBe('1')
   })
 
-  it('已收藏的动态：按钮激活、计数为 1', () => {
+  it('已收藏的动态：按钮激活、aria-pressed 为 true、计数为 1', () => {
     const wrapper = mountCard({ post: { ...post, favorited: true, favoriteCount: 1 } })
+    const favorite = wrapper.get('[data-test="favorite-post"]')
 
-    expect(wrapper.get('[data-test="favorite-post"]').classes()).toContain('post-card__action--active')
+    expect(favorite.attributes('aria-pressed')).toBe('true')
+    expect(favorite.classes()).toContain('post-card__action--active')
     expect(wrapper.get('[data-test="favorite-count"]').text()).toBe('1')
   })
 
