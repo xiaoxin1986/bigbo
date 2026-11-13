@@ -181,6 +181,80 @@ async function main() {
     unknownRoute.status() === 404 && (await unknownRoute.json()).error.code === 'NOT_FOUND',
   )
 
+  // ---------- 5.5 点赞 / 收藏（界面 + REST API 一致性） ----------
+  const reactionCard = page.locator('.post-card').first()
+  check(
+    '初始点赞与收藏计数均为 0',
+    (await reactionCard.locator('[data-test="like-count"]').innerText()) === '0' &&
+      (await reactionCard.locator('[data-test="favorite-count"]').innerText()) === '0',
+  )
+
+  await reactionCard.locator('[data-test="like-post"]').click()
+  await page.waitForFunction(
+    () => document.querySelector('.post-card [data-test="like-count"]')?.textContent === '1',
+  )
+  check(
+    '点击点赞后计数为 1 且按钮激活',
+    (await reactionCard.locator('[data-test="like-post"]').getAttribute('aria-pressed')) === 'true' &&
+      (await reactionCard.locator('[data-test="like-post"]').getAttribute('class')).includes(
+        'post-card__action--active',
+      ),
+  )
+
+  await reactionCard.locator('[data-test="favorite-post"]').click()
+  await page.waitForFunction(
+    () => document.querySelector('.post-card [data-test="favorite-count"]')?.textContent === '1',
+  )
+  check(
+    '点击收藏后计数为 1 且按钮激活',
+    (await reactionCard.locator('[data-test="favorite-post"]').getAttribute('aria-pressed')) ===
+      'true' &&
+      (await reactionCard.locator('[data-test="favorite-post"]').getAttribute('class')).includes(
+        'post-card__action--active',
+      ),
+  )
+
+  const reactedList = await (await api(page.request, 'GET', '/api/posts')).json()
+  const reactedPost = reactedList.posts.find((item) => item.content === '第二条动态')
+  check(
+    '服务端同步保存点赞与收藏状态',
+    Boolean(reactedPost) &&
+      reactedPost.liked === true &&
+      reactedPost.likeCount === 1 &&
+      reactedPost.favorited === true &&
+      reactedPost.favoriteCount === 1,
+    JSON.stringify(reactedPost),
+  )
+
+  const invalidLike = await api(page.request, 'PUT', `/api/posts/${reactedPost.id}/like`, {
+    liked: 'yes',
+  })
+  check(
+    '点赞字段非布尔返回 400 INVALID_BODY',
+    invalidLike.status() === 400 && (await invalidLike.json()).error.code === 'INVALID_BODY',
+  )
+  const missingFavorite = await api(page.request, 'PUT', '/api/posts/not-exist/favorite', {
+    favorited: true,
+  })
+  check(
+    '收藏未知动态返回 404 NOT_FOUND',
+    missingFavorite.status() === 404 && (await missingFavorite.json()).error.code === 'NOT_FOUND',
+  )
+
+  await reactionCard.locator('[data-test="like-post"]').click()
+  await page.waitForFunction(
+    () => document.querySelector('.post-card [data-test="like-count"]')?.textContent === '0',
+  )
+  check(
+    '再次点击可取消点赞',
+    (await reactionCard.locator('[data-test="like-post"]').getAttribute('aria-pressed')) === 'false',
+  )
+  await reactionCard.locator('[data-test="like-post"]').click()
+  await page.waitForFunction(
+    () => document.querySelector('.post-card [data-test="like-count"]')?.textContent === '1',
+  )
+  await page.screenshot({ path: path.join(OUT_DIR, '03-reactions.png'), fullPage: true })
+
   // 等入场动画结束再截图，并确认卡片完全可见
   await page.waitForTimeout(600)
   const cardOpacities = await page.$$eval('.post-card', (nodes) =>
@@ -195,11 +269,28 @@ async function main() {
   check('刷新后动态仍在', (await page.locator('.post-card').count()) === 2)
   check('刷新后顺序不变', (await contents(page))[0] === '第二条动态')
   check('刷新后计数保持 2 条', (await text(page, '[data-test="feed-count"]')) === '2 条')
+  check(
+    '刷新后点赞与收藏状态保持',
+    (await page.locator('.post-card').first().locator('[data-test="like-count"]').innerText()) ===
+      '1' &&
+      (await page.locator('.post-card').first().locator('[data-test="favorite-count"]').innerText()) ===
+        '1',
+  )
 
   const secondPage = await context.newPage()
   await secondPage.goto(BASE_URL, { waitUntil: 'networkidle' })
   await secondPage.waitForSelector('.post-card')
   check('新标签页读到同一份服务端数据', (await secondPage.locator('.post-card').count()) === 2)
+  check(
+    '新标签页共享点赞与收藏状态',
+    (await secondPage.locator('.post-card').first().locator('[data-test="like-count"]').innerText()) ===
+      '1' &&
+      (await secondPage
+        .locator('.post-card')
+        .first()
+        .locator('[data-test="favorite-count"]')
+        .innerText()) === '1',
+  )
   await secondPage.close()
 
   // ---------- 7. 字数上限与超限 ----------
