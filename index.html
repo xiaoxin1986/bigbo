@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="BigBo —— 一个用纯 HTML、CSS 与 JavaScript 打造的极简动态时间线，数据保存在你的浏览器本地。" />
+  <meta name="theme-color" content="#6366F1" />
+  <title>BigBo · 记录此刻，分享所想</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="aurora" aria-hidden="true">
+    <span class="aurora__blob aurora__blob--one"></span>
+    <span class="aurora__blob aurora__blob--two"></span>
+    <span class="aurora__blob aurora__blob--three"></span>
+  </div>
+
+  <header class="site-header">
+    <div class="site-header__inner">
+      <a class="brand" href="#feed" aria-label="BigBo 首页">
+        <span class="brand__logo" aria-hidden="true">B</span>
+        <span class="brand__text">
+          <strong class="brand__name">BigBo</strong>
+          <span class="brand__slogan">记录此刻，分享所想</span>
+        </span>
+      </a>
+      <span class="storage-badge" title="所有内容仅保存在当前浏览器中">
+        <svg class="storage-badge__icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M4 7.5C4 5.57 7.58 4 12 4s8 1.57 8 3.5S16.42 11 12 11 4 9.43 4 7.5Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+          <path d="M4 7.5v9C4 18.43 7.58 20 12 20s8-1.57 8-3.5v-9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+          <path d="M20 12c0 1.93-3.58 3.5-8 3.5S4 13.93 4 12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+        </svg>
+        本地存储
+      </span>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="composer" aria-labelledby="composer-title">
+      <h2 class="sr-only" id="composer-title">发布新动态</h2>
+      <div class="composer__body">
+        <span class="avatar avatar--self" aria-hidden="true">B</span>
+        <div class="composer__field">
+          <label class="sr-only" for="postInput">动态内容</label>
+          <textarea
+            id="postInput"
+            class="composer__input"
+            rows="3"
+            maxlength="280"
+            placeholder="此刻在想什么？"
+            aria-describedby="composerHint"
+          ></textarea>
+          <p class="composer__hint" id="composerHint">支持 Ctrl / ⌘ + Enter 快捷发布</p>
+        </div>
+      </div>
+      <div class="composer__footer">
+        <div class="counter" id="counter" aria-live="polite">
+          <span class="counter__value" id="counterValue">0</span>
+          <span class="counter__limit">/ 280</span>
+        </div>
+        <button class="btn btn--primary" id="publishBtn" type="button" disabled>
+          <span>发布</span>
+          <svg class="btn__icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M4.5 12h13M12 5.5 18.5 12 12 18.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+      </div>
+    </section>
+
+    <section class="feed" id="feed" aria-labelledby="feed-title">
+      <div class="feed__header">
+        <h2 class="feed__title" id="feed-title">最新动态</h2>
+        <span class="feed__count" id="feedCount">0 条</span>
+      </div>
+
+      <div class="empty-state" id="emptyState" hidden>
+        <span class="empty-state__icon" aria-hidden="true">
+          <svg viewBox="0 0 48 48" fill="none">
+            <rect x="8" y="12" width="32" height="24" rx="6" stroke="currentColor" stroke-width="1.8"/>
+            <path d="M15 20h18M15 25h13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            <path d="M17 30h8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+          </svg>
+        </span>
+        <h3 class="empty-state__title">还没有任何动态</h3>
+        <p class="empty-state__text">写下第一条想法，它会保存在这台设备上。</p>
+        <button class="btn btn--ghost" id="emptyAction" type="button">发布第一条</button>
+      </div>
+
+      <ol class="post-list" id="postList" aria-live="polite" aria-relevant="additions"></ol>
+    </section>
+
+    <footer class="site-footer">
+      <p>BigBo · 纯前端演示项目，数据仅存储于当前浏览器</p>
+    </footer>
+  </main>
+
+  <div class="toast-stack" id="toastStack" role="status" aria-live="polite" aria-atomic="true"></div>
+
+  <script defer src="app.js"></script>
+</body>
+</html>
