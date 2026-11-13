@@ -45,6 +45,24 @@ function createServer(initial = []) {
       return noContentResponse()
     }
 
+    const reactionMatch = url.match(/^\/api\/posts\/([^/]+)\/(like|favorite)$/)
+    if (method === 'PUT' && reactionMatch) {
+      const id = decodeURIComponent(reactionMatch[1])
+      const kind = reactionMatch[2]
+      const post = state.find((item) => item.id === id)
+      if (!post) return jsonResponse({ error: { code: 'NOT_FOUND', message: '动态不存在' } }, 404)
+
+      const payload = JSON.parse(options.body || '{}')
+      if (kind === 'like') {
+        post.liked = payload.liked === true
+        post.likeCount = post.liked ? 1 : 0
+      } else {
+        post.favorited = payload.favorited === true
+        post.favoriteCount = post.favorited ? 1 : 0
+      }
+      return jsonResponse({ post: { ...post } })
+    }
+
     return jsonResponse({ error: { code: 'NOT_FOUND', message: '资源不存在' } }, 404)
   })
 
@@ -309,5 +327,56 @@ describe('App', () => {
     await wrapper.vm.$nextTick()
 
     expect(wrapper.get('.post-card__time').text()).toBe('1 分钟前')
+  })
+
+  it('点击点赞后计数变 1、按钮激活，刷新后状态保持', async () => {
+    installServer([{ id: 'p-1', content: '点赞我', createdAt: 1700000000000 }])
+    const wrapper = await mountApp()
+
+    await wrapper.get('[data-test="like-post"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.get('[data-test="like-count"]').text()).toBe('1')
+    expect(wrapper.get('[data-test="like-post"]').classes()).toContain('post-card__action--active')
+
+    // 重新挂载，验证点赞状态已持久化到服务端
+    wrapper.unmount()
+    const second = await mountApp()
+    expect(second.get('[data-test="like-count"]').text()).toBe('1')
+    expect(second.get('[data-test="like-post"]').classes()).toContain('post-card__action--active')
+  })
+
+  it('点击收藏后计数变 1，再次点击取消收藏', async () => {
+    installServer([{ id: 'p-1', content: '收藏我', createdAt: 1700000000000 }])
+    const wrapper = await mountApp()
+
+    await wrapper.get('[data-test="favorite-post"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.get('[data-test="favorite-count"]').text()).toBe('1')
+    expect(wrapper.get('[data-test="favorite-post"]').classes()).toContain('post-card__action--active')
+
+    await wrapper.get('[data-test="favorite-post"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.get('[data-test="favorite-count"]').text()).toBe('0')
+    expect(wrapper.get('[data-test="favorite-post"]').classes()).not.toContain('post-card__action--active')
+  })
+
+  it('点赞失败时提示错误且计数保持 0', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url, options = {}) => {
+        if (((options.method) || 'GET') === 'GET') {
+          return jsonResponse({ posts: [{ id: 'p-1', content: '点不动', createdAt: 1700000000000 }] })
+        }
+        return jsonResponse({ error: { code: 'INTERNAL_ERROR', message: '服务器内部错误' } }, 500)
+      }),
+    )
+
+    const wrapper = await mountApp()
+    await wrapper.get('[data-test="like-post"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.get('[data-test="like-count"]').text()).toBe('0')
+    expect(wrapper.get('.toast').text()).toBe('服务端出错了，请稍后重试')
   })
 })

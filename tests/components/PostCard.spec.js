@@ -8,6 +8,10 @@ const post = {
   id: 'post-abc',
   content: '今天把 BigBo 跑起来了',
   createdAt: NOW - 5 * 60 * 1000,
+  liked: false,
+  favorited: false,
+  likeCount: 0,
+  favoriteCount: 0,
 }
 
 const mountCard = (props = {}) => mount(PostCard, { props: { post, now: NOW, ...props } })
@@ -109,5 +113,44 @@ describe('PostCard', () => {
     expect(imageOnly.get('[data-test="delete-post"]').attributes('aria-label')).toBe(
       '删除动态：图片动态',
     )
+  })
+
+  it('点赞按钮初始未激活，计数为 0', () => {
+    const wrapper = mountCard()
+    const like = wrapper.get('[data-test="like-post"]')
+
+    expect(like.attributes('aria-pressed')).toBe('false')
+    expect(like.classes()).not.toContain('post-card__action--active')
+    expect(wrapper.get('[data-test="like-count"]').text()).toBe('0')
+  })
+
+  it('已点赞的动态：按钮激活、aria-pressed 为 true、计数为 1', () => {
+    const wrapper = mountCard({ post: { ...post, liked: true, likeCount: 1 } })
+    const like = wrapper.get('[data-test="like-post"]')
+
+    expect(like.attributes('aria-pressed')).toBe('true')
+    expect(like.classes()).toContain('post-card__action--active')
+    expect(wrapper.get('[data-test="like-count"]').text()).toBe('1')
+  })
+
+  it('已收藏的动态：按钮激活、aria-pressed 为 true、计数为 1', () => {
+    const wrapper = mountCard({ post: { ...post, favorited: true, favoriteCount: 1 } })
+    const favorite = wrapper.get('[data-test="favorite-post"]')
+
+    expect(favorite.attributes('aria-pressed')).toBe('true')
+    expect(favorite.classes()).toContain('post-card__action--active')
+    expect(wrapper.get('[data-test="favorite-count"]').text()).toBe('1')
+  })
+
+  it('点击点赞按钮触发 like 事件', async () => {
+    const wrapper = mountCard()
+    await wrapper.get('[data-test="like-post"]').trigger('click')
+    expect(wrapper.emitted('like')).toHaveLength(1)
+  })
+
+  it('点击收藏按钮触发 favorite 事件', async () => {
+    const wrapper = mountCard()
+    await wrapper.get('[data-test="favorite-post"]').trigger('click')
+    expect(wrapper.emitted('favorite')).toHaveLength(1)
   })
 })
