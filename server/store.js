@@ -21,7 +21,15 @@ export function defaultCreateId() {
 }
 
 function clonePost(post) {
-  const copy = { id: post.id, content: post.content, createdAt: post.createdAt }
+  const copy = {
+    id: post.id,
+    content: post.content,
+    createdAt: post.createdAt,
+    liked: post.liked,
+    favorited: post.favorited,
+    likeCount: post.likeCount,
+    favoriteCount: post.favoriteCount,
+  }
   if (post.image) {
     copy.image = { dataUrl: post.image.dataUrl, name: post.image.name ?? null }
   }
@@ -36,6 +44,8 @@ function clonePost(post) {
  *   get: (id: string) => object | null,
  *   create: (input: { content?: string, image?: null | { dataUrl: string, name?: string | null } }) => object,
  *   remove: (id: string) => object | null,
+ *   setLike: (id: string, liked: boolean) => object | null,
+ *   setFavorite: (id: string, favorited: boolean) => object | null,
  *   clear: () => void,
  *   readonly size: number,
  * }}
@@ -59,7 +69,15 @@ export function createPostStore({ now = () => Date.now(), createId = defaultCrea
 
     create({ content = '', image = null } = {}) {
       seq += 1
-      const post = { id: createId(), content, createdAt: now() }
+      const post = {
+        id: createId(),
+        content,
+        createdAt: now(),
+        liked: false,
+        favorited: false,
+        likeCount: 0,
+        favoriteCount: 0,
+      }
       if (image) {
         post.image = {
           dataUrl: image.dataUrl,
@@ -75,6 +93,22 @@ export function createPostStore({ now = () => Date.now(), createId = defaultCrea
       const entry = entries.get(key)
       if (!entry) return null
       entries.delete(key)
+      return clonePost(entry.post)
+    },
+
+    setLike(id, liked) {
+      const entry = entries.get(String(id))
+      if (!entry) return null
+      entry.post.liked = liked === true
+      entry.post.likeCount = entry.post.liked ? 1 : 0
+      return clonePost(entry.post)
+    },
+
+    setFavorite(id, favorited) {
+      const entry = entries.get(String(id))
+      if (!entry) return null
+      entry.post.favorited = favorited === true
+      entry.post.favoriteCount = entry.post.favorited ? 1 : 0
       return clonePost(entry.post)
     },
 

@@ -303,6 +303,108 @@ describe('DELETE /api/posts/:id', () => {
   })
 })
 
+const putJson = (app, url, payload) =>
+  app.request(url, { method: 'PUT', headers: JSON_HEADERS, body: JSON.stringify(payload) })
+
+describe('PUT /api/posts/:id/like', () => {
+  it('点赞成功返回 200 与更新后的动态', async () => {
+    const { app } = setup()
+    const created = await readJson(await postJson(app, { content: '点赞我' }))
+    const response = await putJson(app, `/api/posts/${created.post.id}/like`, { liked: true })
+
+    expect(response.status).toBe(200)
+    const body = await readJson(response)
+    expect(body.post.liked).toBe(true)
+    expect(body.post.likeCount).toBe(1)
+    expect(body.post.favorited).toBe(false)
+  })
+
+  it('取消点赞返回 200 且计数归零（幂等）', async () => {
+    const { app } = setup()
+    const created = await readJson(await postJson(app, { content: '再取消' }))
+    await putJson(app, `/api/posts/${created.post.id}/like`, { liked: true })
+    const response = await putJson(app, `/api/posts/${created.post.id}/like`, { liked: false })
+
+    const body = await readJson(response)
+    expect(body.post.liked).toBe(false)
+    expect(body.post.likeCount).toBe(0)
+  })
+
+  it('liked 非布尔返回 400 INVALID_BODY', async () => {
+    const { app } = setup()
+    const created = await readJson(await postJson(app, { content: '非法点赞' }))
+    const response = await putJson(app, `/api/posts/${created.post.id}/like`, { liked: 'yes' })
+
+    expect(response.status).toBe(400)
+    const body = await readJson(response)
+    expect(body.error.code).toBe('INVALID_BODY')
+    expect(body.error.message).toBe('liked 必须是布尔值')
+  })
+
+  it('未知 id 返回 404 NOT_FOUND', async () => {
+    const { app } = setup()
+    const response = await putJson(app, '/api/posts/not-here/like', { liked: true })
+    expect(response.status).toBe(404)
+    expect((await readJson(response)).error.code).toBe('NOT_FOUND')
+  })
+})
+
+describe('PUT /api/posts/:id/favorite', () => {
+  it('收藏成功返回 200 与更新后的动态', async () => {
+    const { app } = setup()
+    const created = await readJson(await postJson(app, { content: '收藏我' }))
+    const response = await putJson(app, `/api/posts/${created.post.id}/favorite`, { favorited: true })
+
+    expect(response.status).toBe(200)
+    const body = await readJson(response)
+    expect(body.post.favorited).toBe(true)
+    expect(body.post.favoriteCount).toBe(1)
+    expect(body.post.liked).toBe(false)
+  })
+
+  it('取消收藏返回 200 且计数归零', async () => {
+    const { app } = setup()
+    const created = await readJson(await postJson(app, { content: '取消收藏' }))
+    await putJson(app, `/api/posts/${created.post.id}/favorite`, { favorited: true })
+    const response = await putJson(app, `/api/posts/${created.post.id}/favorite`, { favorited: false })
+
+    const body = await readJson(response)
+    expect(body.post.favorited).toBe(false)
+    expect(body.post.favoriteCount).toBe(0)
+  })
+
+  it('favorited 非布尔返回 400 INVALID_BODY', async () => {
+    const { app } = setup()
+    const created = await readJson(await postJson(app, { content: '非法收藏' }))
+    const response = await putJson(app, `/api/posts/${created.post.id}/favorite`, { favorited: 0 })
+
+    expect(response.status).toBe(400)
+    const body = await readJson(response)
+    expect(body.error.code).toBe('INVALID_BODY')
+    expect(body.error.message).toBe('favorited 必须是布尔值')
+  })
+
+  it('未知 id 返回 404 NOT_FOUND', async () => {
+    const { app } = setup()
+    const response = await putJson(app, '/api/posts/not-here/favorite', { favorited: true })
+    expect(response.status).toBe(404)
+    expect((await readJson(response)).error.code).toBe('NOT_FOUND')
+  })
+
+  it('点赞与收藏状态互相独立', async () => {
+    const { app } = setup()
+    const created = await readJson(await postJson(app, { content: '既赞又藏' }))
+    await putJson(app, `/api/posts/${created.post.id}/like`, { liked: true })
+    const response = await putJson(app, `/api/posts/${created.post.id}/favorite`, { favorited: true })
+
+    const body = await readJson(response)
+    expect(body.post.liked).toBe(true)
+    expect(body.post.favorited).toBe(true)
+    expect(body.post.likeCount).toBe(1)
+    expect(body.post.favoriteCount).toBe(1)
+  })
+})
+
 describe('未知路由', () => {
   it('未知 /api 路径返回 JSON 404 NOT_FOUND', async () => {
     const { app } = setup()
